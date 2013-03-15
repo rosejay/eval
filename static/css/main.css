@@ -67,9 +67,16 @@ body{
 #page-2 .level{
 	width: 100%;
 	height: auto;
-
+	display: -webkit-box;
+    -webkit-box-pack: center;
+    -webkit-box-align: start;
 }
-
+.map{
+	border: 1px solid #ddd;
+	width: 100%;
+	height: 100%;
+	position: relative;
+}
 #page-2 .myCanvas{
 	z-index: 100;
 	display: none;
@@ -79,7 +86,6 @@ body{
 	top: 0;
 	left: 0
 }
-
 
 
 
@@ -532,7 +538,10 @@ input:-moz-placeholder, textarea:-moz-placeholder {
 
 
 
-
+#rect{
+			border:2px solid red;
+			position: absolute;
+		}
 
 #panel{
 	position: absolute;

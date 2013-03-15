@@ -27,25 +27,35 @@ function init(){
 
 }
 
-var Node = function( index, type ){
+var Node = function( bnds ){
 
    this.children = [];
    this.rect = [];
-   this.bnds = [];
+   this.bnds = bnds;
 
    this.level = 0;
+   this.zoom = 1;
    this.parent = null;
-
-   //this.style = this.parent.style;
    
+   if(bnds){
+      this.centerLat = (bnds.fa.b + bnds.fa.d)/2;
+      this.centerLng = (bnds.ka.b + bnds.ka.d)/2;
+   }
+   else{
+      this.centerLat = 40;
+      this.centerLng = -30;
+   }
+
+   console.log("c",this.centerLat, this.centerLng);
 
    this.html = $("<div class='map' style='width:" + (winwidth) + "px;height:" + (winheight) + "px'></div>");
+
 
    this.mapOptions = {
          scrollwheel: false,
          mapTypeControl: false,
          scaleControl: false,
-         center: new google.maps.LatLng(40, -30),
+         center: new google.maps.LatLng( this.centerLat, this.centerLng ),
          zoom: 3,
          disableDoubleClickZoom: true,
          mapTypeId: google.maps.MapTypeId.ROADMAP,
@@ -57,8 +67,13 @@ var Node = function( index, type ){
 
    this.map = new google.maps.Map(this.html[0], this.mapOptions);
    this.canvas = $("<canvas class='myCanvas'></canvas>");
-   
 
+   if(this.bnds){
+
+
+      console.log("b",bnds.getNorthEast(),bnds.getSouthWest());
+      this.map.fitBounds(bnds);
+   }
    
 
 }
@@ -67,127 +82,154 @@ Node.prototype.init = function(item){
    // add div level
    $("#level"+item.level).append(item.html);
 
+   if(item.level == 1){
+      item.html.css("zoom",0.3);
+      item.zoom = 0.3;
+   } 
 
-   var startX = startY = x = y = 0;
-   var isPressed = false;
+   var startX = 0,
+       startY = 0,
+       left , top, 
+       width = 0, 
+       height = 0;
 
-   var mousemove = function(e){
+   var rect = document.createElement("div");
+   rect.style.border = "6px solid #000";
+   rect.style.position = "absolute";
+   rect.style.width = width;
+   rect.style.height = height;
+   rect.id = "rect";
+
+
+   // if key shift, show add listener
+   var showDrawCanvas = function(e){
 
       if(e.shiftKey){
-
-         // add canvas
-         if(!$(this).find('canvas.myCanvas').length){
-            item.html.append(item.canvas);
-         }
-
-         item.canvas.css("display","block");
-         item.canvas.attr("width", winwidth).attr("height", winheight);
-
-         // init drawing
-         var ctx=item.canvas[0].getContext("2d");
-         ctx.lineWidth = 7;
-
-         // isPressed
-         
-
-         var mousedown = function(e){
-            isPressed = true;
-            startX = e.pageX-parseInt(item.canvas.offset().left);
-            startY = e.pageY-parseInt(item.canvas.offset().top);
-            item.rect.push([startX,startY,0,0]);
-            console.log(item.rect.length)
-         }
-         var mousemove_ = function(e){
-            if(isPressed){
-               x = e.pageX-parseInt(item.canvas.offset().left) ;
-               y = e.pageY-parseInt(item.canvas.offset().top) ;
-
-               var index = item.rect.length - 1;
-               item.rect[index][2] = x - startX;
-               item.rect[index][3] = y - startY;
-         
-
-               ctx.clearRect();
-               ctx.strokeStyle = "rgba(0,0,0)";
-               ctx.strokeRect(startX, startY, x - startX, y - startY);
-            }
-         }
-         var mouseup  = function(e){
-            if(isPressed){
-               isPressed = false;
-               item.canvas.css("display","none");
-
-               var overlay = new google.maps.OverlayView();
-               overlay.draw = function () {};
-               overlay.onRemove = function () {};
-               overlay.setMap(item.map);
-
-
-               var prj = overlay.getProjection();
-               var sw = prj.fromContainerPixelToLatLng(new google.maps.Point(startX, y));
-               var ne = prj.fromContainerPixelToLatLng(new google.maps.Point(x, startY));
-               var bnds = new google.maps.LatLngBounds(sw, ne);
-               item.bnds.push(bnds);
-               console.log(bnds);
-
-
-               
-
-               addRect();
-            }
-         }
-
-         $(this).mousedown(mousedown);
-         $(this).mousemove(mousemove_);
-         $(this).mouseup(mouseup);
-
-         function addRect(){
-
-            var index = item.rect.length - 1;
-            console.log("d",index);
-
-            var tempcanvas = document.createElement('canvas');
-            tempcanvas.width = item.rect[index][2];
-            tempcanvas.height = item.rect[index][3];
-
-            console.log(item.rect[index][3])
-            // init drawing
-            var ctx=tempcanvas.getContext("2d");
-            ctx.lineWidth = 7;
-            ctx.strokeStyle = "rgba(0,0,0)";
-            ctx.strokeRect(0,0, item.rect[index][2],item.rect[index][3]);
-
-            $(tempcanvas).css("top", item.rect[index][1]+"px")
-                     .css("left", item.rect[index][0]+"px")
-                     .addClass("rectCanvas");
-
-            $("#level"+item.level).append(tempcanvas);
-         }
-
+         item.html.mousedown(mouseDown);
       }
-      else{
-         item.canvas.css("display","none");
-      }
+      else
+         item.html[0].removeEventListener("mouseDown", mouseDown);
+   }
+   item.html.mousemove(showDrawCanvas);
+
+   // mouse down
+   // add mousemove and mouseup listener
+   function mouseDown(e){
+      e.preventDefault();
+      item.html.mousemove(mouseMove);
+      item.html.mouseup(mouseUp);
+
+      startX = (e.pageX-parseInt(item.html.offset().left)*item.zoom)/item.zoom;
+      startY = (e.pageY-parseInt(item.html.offset().top)*item.zoom)/item.zoom;
+      left = startX;
+      top = startY;
+
+      rect.style.left = startX+"px";
+      rect.style.top = startY+"px";
+      item.html.append(rect);
+      //console.log(item.html.offset().top*item.zoom, item.html.offset().left*item.zoom, "d");
+      
+   }
+
+   // mouse up
+   // remove mousemove and mouseup listener
+   function mouseUp(e){
+
+
+      // remove listener
+      item.html[0].removeEventListener("mouseMove", mouseMove);
+      item.html[0].removeEventListener("mouseUp", mouseUp);
+      item.html[0].removeEventListener("mouseDown", mouseDown);
+
+      // remove rect
+      rect.parentNode.removeChild(rect);
+
+
+
+      var overlay = new google.maps.OverlayView();
+      overlay.draw = function () {};
+      overlay.onRemove = function () {};
+      overlay.setMap(item.map);
+      var prj = overlay.getProjection();
+      var sw = prj.fromContainerPixelToLatLng(new google.maps.Point(left, top-height));
+      var ne = prj.fromContainerPixelToLatLng(new google.maps.Point(left-width, top));
+      var bnds = new google.maps.LatLngBounds(sw, ne);
+      console.log(bnds.getNorthEast(),bnds.getSouthWest());
+      console.log(left, top+height);
+      console.log(left+width, top);
+      // add new child
+      item.add( new Node( bnds ) );
+
+      addRect();
+      //console.log(left, top, width, height);
+   }
+
+   // mousemove
+   // update width & height
+   function mouseMove(e){
+      width = ((e.pageX-parseInt(item.html.offset().left)*item.zoom)/item.zoom - startX);
+      //height = ((e.pageY-parseInt(item.html.offset().top)*item.zoom)/item.zoom - startY);
+      height = width*winheight/winwidth;
+      //console.log(e.pageX, e.pageY, startX, startY, width, height);
+
+      left = width < 0 ? e.pageX : left;
+      top = height < 0 ? e.pageY : top;
+
+      rect.style.left = left + "px";
+      rect.style.top = top + "px";
+      rect.style.width = Math.abs(width) + "px";
+      rect.style.height = Math.abs(height) + "px";
+
+      width = Math.abs(width);
+      height = Math.abs(height);
 
    }
 
 
-   item.html.mousemove(mousemove);
+   function addRect(){
+
+      // add rect 
+      item.rect.push([left, top, Math.abs(width), Math.abs(height)]);
+      var index = item.rect.length - 1;
+
+      // 
+      var tempcanvas = document.createElement('canvas');
+      tempcanvas.width = item.rect[index][2];
+      tempcanvas.height = item.rect[index][3];
+
+      // init drawing
+      var ctx=tempcanvas.getContext("2d");
+      ctx.lineWidth = 10;
+      ctx.strokeStyle = "rgba(0,0,0)";
+      ctx.strokeRect(0,0, item.rect[index][2],item.rect[index][3]);
+
+
+      $(tempcanvas).css("top", item.rect[index][1]+"px")
+               .css("left", item.rect[index][0]+"px")
+               .addClass("rectCanvas");
+
+      item.html.append(tempcanvas);
+
+      
+   }
+
 
 }
 
 
 
-         
+        
 
 
 
 
 Node.prototype.add = function(item){
-
    item.parent = this;
+   item.level = item.parent.level + 1;
    this.children.push(item);
 
+   
+   item.init(item);
    return item;
 }
 
@@ -209,26 +251,11 @@ Node.prototype.getLevelNum = function(){
    }
 
    this.level = index;
+   console.log(index);
 }
 
-var root = new Node( "root" );
-root.getLevelNum();
+var root = new Node(  );
 root.init(root);
-var child1 = root.add( new Node(">child1") );
-
-
-
-
-
-
-function addChild(item){
-
-
-
-
-
-
-}
 
 
       
