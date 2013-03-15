@@ -540,3 +540,6 @@ input:-moz-placeholder, textarea:-moz-placeholder {
 	left: 0;
 	z-index: 100;
 }
+.rectCanvas{
+	position: absolute;
+}

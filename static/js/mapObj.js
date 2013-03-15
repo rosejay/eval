@@ -3,7 +3,6 @@ var childNum = 5, levelNum = 4;
 var levelDepth = 0;
 var winwidth = window.innerWidth;
 var winheight = window.innerHeight;
-var processingInstance;
 
 // define target message;
 var Msg = function(txt, author, lat, lng){
@@ -70,8 +69,9 @@ Node.prototype.init = function(item){
 
 
    var startX = startY = x = y = 0;
+   var isPressed = false;
 
-   item.html.bind("mousemove", function(e){
+   var mousemove = function(e){
 
       if(e.shiftKey){
 
@@ -81,68 +81,98 @@ Node.prototype.init = function(item){
          }
 
          item.canvas.css("display","block");
-         processingInstance = new Processing(item.canvas[0], drawObj);
+         item.canvas.attr("width", winwidth).attr("height", winheight);
 
-         function drawObj(processing){
+         // init drawing
+         var ctx=item.canvas[0].getContext("2d");
+         ctx.lineWidth = 7;
 
-            // init processing property
-            processing.size(winwidth,winheight);
-            processing.background(0,0,0,30);
-            processing.stroke(220,220,220);
-            processing.strokeWeight(7);
-            processing.strokeCap(processing.ROUND);
-            processing.fill(150);
-            processing.noLoop();
+         // isPressed
+         
 
-            processing.draw = function (){
-               processing.rect(startX, startY, x - startX, y - startY);
+         var mousedown = function(e){
+            isPressed = true;
+            startX = e.pageX-parseInt(item.canvas.offset().left);
+            startY = e.pageY-parseInt(item.canvas.offset().top);
+            item.rect.push([startX,startY,0,0]);
+            console.log(item.rect.length)
+         }
+         var mousemove_ = function(e){
+            if(isPressed){
+               x = e.pageX-parseInt(item.canvas.offset().left) ;
+               y = e.pageY-parseInt(item.canvas.offset().top) ;
+
+               var index = item.rect.length - 1;
+               item.rect[index][2] = x - startX;
+               item.rect[index][3] = y - startY;
+         
+
+               ctx.clearRect();
+               ctx.strokeStyle = "rgba(0,0,0)";
+               ctx.strokeRect(startX, startY, x - startX, y - startY);
             }
-            processing.mousePressed = function () {
-               startX = processing.mouseX;
-               startY = processing.mouseY;
-
-               //startX = processing.mouseX-parseInt(item.canvas.offset().left);
-               //startY = processing.mouseY-parseInt(item.canvas.offset().top);
-               console.log(startX);
-            }
-            processing.mouseDragged = function () {
-
-               if(processing.mousePressed){
-
-                  x = processing.mouseX-parseInt(item.canvas.offset().left) ;
-                  y = processing.mouseY-parseInt(item.canvas.offset().top) ;
-
-                  processing.fill(0,0,0);
-               }
-
-            }
-            processing.mouseReleased = function () {
-
+         }
+         var mouseup  = function(e){
+            if(isPressed){
+               isPressed = false;
                item.canvas.css("display","none");
 
-               var ov = new google.maps.OverlayView();
-               ov.draw = function () {};
-               ov.onRemove = function () {};
-               ov.setMap(item.map);
-               var prj = ov.getProjection();
+               var overlay = new google.maps.OverlayView();
+               overlay.draw = function () {};
+               overlay.onRemove = function () {};
+               overlay.setMap(item.map);
+
+
+               var prj = overlay.getProjection();
                var sw = prj.fromContainerPixelToLatLng(new google.maps.Point(startX, y));
                var ne = prj.fromContainerPixelToLatLng(new google.maps.Point(x, startY));
                var bnds = new google.maps.LatLngBounds(sw, ne);
                item.bnds.push(bnds);
                console.log(bnds);
 
-            }
-            function popupObj(){
-
 
                
+
+               addRect();
             }
-         } 
+         }
+
+         $(this).mousedown(mousedown);
+         $(this).mousemove(mousemove_);
+         $(this).mouseup(mouseup);
+
+         function addRect(){
+
+            var index = item.rect.length - 1;
+            console.log("d",index);
+
+            var tempcanvas = document.createElement('canvas');
+            tempcanvas.width = item.rect[index][2];
+            tempcanvas.height = item.rect[index][3];
+
+            console.log(item.rect[index][3])
+            // init drawing
+            var ctx=tempcanvas.getContext("2d");
+            ctx.lineWidth = 7;
+            ctx.strokeStyle = "rgba(0,0,0)";
+            ctx.strokeRect(0,0, item.rect[index][2],item.rect[index][3]);
+
+            $(tempcanvas).css("top", item.rect[index][1]+"px")
+                     .css("left", item.rect[index][0]+"px")
+                     .addClass("rectCanvas");
+
+            $("#level"+item.level).append(tempcanvas);
+         }
+
       }
       else{
          item.canvas.css("display","none");
       }
-   });
+
+   }
+
+
+   item.html.mousemove(mousemove);
 
 }
 
@@ -179,7 +209,6 @@ Node.prototype.getLevelNum = function(){
    }
 
    this.level = index;
-   console.log(this.level);
 }
 
 var root = new Node( "root" );
