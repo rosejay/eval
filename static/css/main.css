@@ -40,7 +40,6 @@ div{display: block;}
 html{
 	width: 100%;
   	height: 100%;
-  	background: #f9f6e7;
 }
 body{
 	overflow-y: auto;
@@ -70,6 +69,7 @@ body{
 	display: -webkit-box;
     -webkit-box-pack: center;
     -webkit-box-align: start;
+    overflow-x: auto;
 }
 .map{
 	border: 1px solid #ddd;
@@ -77,18 +77,13 @@ body{
 	height: 100%;
 	position: relative;
 }
-#page-2 .myCanvas{
-	z-index: 100;
-	display: none;
-	width: 100%;
-	height: 100%;
-	position: relative;
-	top: 0;
-	left: 0
+#page-2 .fullscreen{
+	position: absolute;
+	z-index: 200;
+	top: -2px;
+	left: -2px;
+	zoom: 1 !important;
 }
-
-
-
 
 
 
@@ -105,13 +100,7 @@ body{
     -webkit-box-align: start;*/
 	-webkit-user-select: none;
 }
-#page-2 .canvasBox.fullscreen{
-	position: absolute;
-	z-index: 200;
-	top: -2px;
-	left: -2px;
-	zoom: 1 !important;
-}
+
 #page-2 .canvasBox{
 	margin: 5px;
 	float: left;
@@ -429,113 +418,43 @@ input:-moz-placeholder, textarea:-moz-placeholder {
 
 
 
-.canvasBox:hover .deletePic, .canvasBox:hover .fullPic{
-	opacity:1.0;
 
-	transition:all 0.5s;
-	-moz-transition:all 0.5s; /* Firefox 4 */
-	-webkit-transition:all 0.5s; /* Safari and Chrome */
-	-o-transition:all 0.5s; /* Opera */
-}
+
 .fullPic{
-	z-index: 300;
+	z-index: 100;
 	position: absolute;
 	right: 10px;
 	bottom: 10px;
 	width: 40px;
 	height: 40px;
 	overflow: hidden;
-	opacity:0;
 	cursor: pointer;
+	background: url(../img/full0.png);
 }
-.deletePic{
-	z-index: 300;
+.deleteBtn{
+	background: url(../img/close0.png);
+	width: 40px;
+	height: 40px;
 	position: absolute;
 	right: 10px;
 	top: 10px;
-	width: 40px;
-	height: 40px;
-	overflow: hidden;
-	font-size: 14px;
-	opacity:0;
-	cursor: default;
-}
-.fullscreen .deletePic, .fullscreen .fullPic{
-	zoom: 1 !important;
-}
-.fullscreen .deletePic .text{
-	font-size: 14px;
-}
-
-.deletePic:hover{
-	width:250px;
-} 
-.fullscreen .deletePic:hover, .bigger .deletePic:hover{
-	width:185px;
-}
-.deletePic .deleteBtn{
-	background: url(../img/close-w.png);
-	width: 40px;
-	height: 40px;
-	position: absolute;
-	left: 0;
-	top: 0;
-}
-.deletePic .text{
-	position: absolute;
-	left: 45px;
-	top: 10px;
-	float: left;
-	width: 250px;
-	height: 40px;
-	display: block;
-	padding-left: 5px;
-	font-size: 10px;
-}
-
-
-.deletePic .text span, .deletePic .text a{
-	float: left;
-	display: block;
-	line-height: 30px;
-	margin: 0 10px 0 0;
-	font-weight: normal;
-	color: #fff;
-}
-.deletePic .text a{
 	cursor: pointer;
-	font-weight: bold;
-}
-.deletePic .text a:hover{
-	color: #fff;
-	text-decoration: underline;
-}
-.deletePic .text span.color0, 
-.deletePic .text a.color0, 
-.deletePic .text a.color0:hover{
-	color: #4b4b4d;
-}
-.deletePic .text span.color1, 
-.deletePic .text a.color1, 
-.deletePic .text a.color1:hover{
-	color: #e54b4b;
-}
-.deletePic .text span.color2, 
-.deletePic .text a.color2, 
-.deletePic .text a.color2:hover{
-	color: #44669d;
-}
-.deletePic .text span.color3, 
-.deletePic .text a.color3, 
-.deletePic .text a.color3:hover{
-	color: #6fa858;
-}
-.deletePic .text span.color4, 
-.deletePic .text a.color4, 
-.deletePic .text a.color4:hover{
-	color: #ff9900;
-}
+	z-index: 100;
 
+}
+.deleteBtn, .fullPic{
+	opacity: 0;
+
+	transition:all 0.2s;
+	-moz-transition:all 0.2s; /* Firefox 4 */
+	-webkit-transition:all 0.2s; /* Safari and Chrome */
+	-o-transition:all 0.2s; /* Opera */
+}
+.map:hover .deleteBtn, 
+.map:hover .fullPic{
+	opacity: 1;
+
+}
 
 
 #rect{
@@ -551,4 +470,138 @@ input:-moz-placeholder, textarea:-moz-placeholder {
 }
 .rectCanvas{
 	position: absolute;
+}
+
+
+.zoom{
+	position: absolute;
+	top: 120px;
+	left: 0;
+	width: 110px;
+	padding: 20px;
+	border: 1px solid #eee;
+	height: 20px;
+	background: #fff;
+	color: #aaa;
+	z-index: 100;
+	line-height: 20px;
+}
+
+
+
+.setup{
+	width: 440px;
+	height: 360px;
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	margin-left: -250px;
+	margin-top: -200px;
+	background: #fff;
+	padding: 20px;
+	border: 1px solid #ddd;
+
+}
+.setup li{
+	height: 50px;
+	line-height: 50px;
+	color: #ddd;
+	font-size: 16px;
+	margin-bottom: 20px;
+}
+.setup li.h-30{
+	line-height: 30px;
+	height: 30px;
+}
+.setup li.h-60{
+	padding: 20px;
+	width: 400px;
+	border: 1px solid #ddd;
+	line-height: 30px;
+	height: 60px;
+	color: #ddd;
+}
+.setup li p.title{
+	border-bottom: 1px solid #eee;
+	font-size: 16px;
+	line-height: 30px;
+	color: #ddd;
+}
+.setup li p.left{
+	width: 120px;
+	text-align: right;
+}
+.setup li p.right{
+	color: #bbb;
+	margin-left: 20px;
+	width: 290px;
+}
+.setup li p span{
+	text-align: center;
+	float: left;
+	display: block;
+	width: 120px;
+	height: 50px;
+	margin-right: 20px;
+	border: 1px solid #bbb;
+	font-size: 20px;
+	cursor: pointer;
+}
+.setup li p span.btn{
+	float: right;
+	width: 100px;
+	height: 30px;
+	line-height: 30px; 
+	color: #bbb;
+}
+.setup li p span:hover,
+.setup li p span.sel{
+	background: #bbb;
+	color: #fff;
+}
+
+
+.finish{
+	margin-top: -60px;
+	height: 150px;
+	border: 1px solid #eee;
+	display: none;
+}
+.finish li p{
+	text-align: center;
+}
+.finish li p#targetNum{
+	font-size: 30px;
+	line-height: 30px;
+	margin-top: 20px;
+}
+.finish li p span{
+	width: 100px;
+	height: 30px;
+	line-height: 30px; 
+	color: #bbb;
+}
+.finish li p span{
+	margin-right: 150px; 
+}
+
+.eval-info{
+	color: #aaa;
+	position: absolute;
+	top: 20px;
+	left: 0;
+	z-index: 100;
+	background: #fff;
+	width: 110px;
+	height: 60px;
+	border: 1px solid #eee;
+	padding: 20px;
+	line-height: 20px;
+}
+.eval-info p{
+	line-height: 20px;
+}
+.eval-info #tech{
+	font-size: 20px;
+	line-height: 25px;
 }

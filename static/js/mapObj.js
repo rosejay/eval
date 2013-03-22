@@ -1,61 +1,77 @@
+   
+   
 
-var childNum = 5, levelNum = 4;
-var levelDepth = 0;
-var winwidth = window.innerWidth;
-var winheight = window.innerHeight;
-
-// define target message;
-var Msg = function(txt, author, lat, lng){
-
-   this.txt = txt;
-   this.author = author;
-   this.lat = lat;
-   this.lng = lng;
-}
-var message = new Msg( "Hello World!", "Ye Lin", 45, 2 );
+   var childNum,   // children number for each level
+      levelNum;   // maximum level number
 
 
 
-init();
-function init(){
-
-   // init level <li>
-   for(var i = 0; i<levelNum; i++){
-      $("#page-2 ul").append("<li id='level"+i+"' class='level'></li>");
-   }
 
 
-}
 
-var Node = function( bnds ){
+   var initZoomLevel = 3,
+      zoom = initZoomLevel,   // google map zoom value
+      level = zoom - 3, // my level value
+      focusNum;   // focusNum area index
+
+
+
+
+   var winwidth = window.innerWidth,   // windows width
+      winheight = window.innerHeight;  // windows height
+
+   var rectWidth = winwidth/4,      // rect marker width
+      rectHeight = winheight/4;  // rect marker height
+
+   // def of marker rect and marker center points
+   var rectPoint =[[ winwidth/2, winheight/3 ],
+               [ winwidth*5/6, winheight*5/8 ],
+               [ winwidth/2, winheight*11/12 ],
+               [ winwidth/6, winheight*5/8 ],
+               [ winwidth/2, winheight*5/8 ]];
+
+   var times = true;
+
+
+   var levelDepth = 0;
+   var winwidth = window.innerWidth;
+   var winheight = window.innerHeight;
+
+
+
+var Node = function( level, bnds ){
 
    this.children = [];
    this.rect = [];
    this.bnds = bnds;
 
-   this.level = 0;
-   this.zoom = 1;
+   this.level = level;
+   this.zoom = this.tempZoom = 1;
+   this.isfull = false;
    this.parent = null;
+   this.style = 0;
+   this.childStyle = 0;
    
-   if(bnds){
-      this.centerLat = (bnds.fa.b + bnds.fa.d)/2;
-      this.centerLng = (bnds.ka.b + bnds.ka.d)/2;
-   }
-   else{
-      this.centerLat = 40;
-      this.centerLng = -30;
-   }
 
-   console.log("c",this.centerLat, this.centerLng);
+   // marker
+   this.markerArray = [];
+   this.focusNum = -1;
 
    this.html = $("<div class='map' style='width:" + (winwidth) + "px;height:" + (winheight) + "px'></div>");
+   this.deleteBtn = $("<div class='deleteBtn'></div>");
+   this.fullscreen = $("<div class='fullPic'></div>");
 
+                     
+   // add div level
+   $("#level"+this.level).append(this.html);
+
+   
 
    this.mapOptions = {
          scrollwheel: false,
          mapTypeControl: false,
          scaleControl: false,
-         center: new google.maps.LatLng( this.centerLat, this.centerLng ),
+         center: new google.maps.LatLng( 30,120 ),
          zoom: 3,
          disableDoubleClickZoom: true,
          mapTypeId: google.maps.MapTypeId.ROADMAP,
@@ -66,26 +82,133 @@ var Node = function( bnds ){
       };
 
    this.map = new google.maps.Map(this.html[0], this.mapOptions);
-   this.canvas = $("<canvas class='myCanvas'></canvas>");
+
+   this.overlay = new google.maps.OverlayView();
+   this.overlay.draw = function () {};
+   this.overlay.onRemove = function () {};
+   this.overlay.setMap(this.map);
+   this.prj; 
+
 
    if(this.bnds){
 
+      z = this.map.getZoom();
+      this.map.fitBounds(this.bnds);
+      if (this.map.getZoom() < z) {
+         this.map.setZoom(z);
+      }
 
-      console.log("b",bnds.getNorthEast(),bnds.getSouthWest());
-      this.map.fitBounds(bnds);
+
    }
-   
+
+   var self = this;
+   google.maps.event.addListener(this.map, 'idle', function() {
+
+      self.prj = self.overlay.getProjection();
+
+      // for level 0, no delete btn
+      if(self.level != 0)
+         self.html.append(self.deleteBtn);
+      
+      self.html.append(self.fullscreen);
+      
+      // first time
+      if(times){
+         generateMarker();
+         times = false;
+      }
+      else{
+         // if it's the right path
+         if(target[self.level-1] == self.genNum){
+
+            // if it is the target!
+            if(self.level + 1 == levelNum ){
+
+
+               targetMarker = new google.maps.Marker({
+                  position: self.map.getCenter(),
+                  map: self.map
+               });
+               // set target marker
+               $("#targetNum").html(message);
+               $(".finish").fadeIn();
+            }
+            else{ // else it's not yet reached the target but display the rect
+               generateMarker();
+            }
+         }
+
+      }
+
+
+      function generateMarker(){
+
+         // clear
+         clearMarker();
+
+         // generate
+         for(var i = 0; i<childNum; i++){
+            self.markerArray.push( new Marker(i, self) );
+         }
+      }
+         
+      // clear markerArray
+      function clearMarker(){
+
+         // clear rect
+         for (var i = 0; i < self.markerArray.length; i++ ) {
+            self.markerArray[i].clear();
+         }
+         self.markerArray = [];
+
+      }
+
+   });
+
+   google.maps.event.addListener(this.map, 'dblclick', function() {
+
+      self.html.find(".fullPic").click();
+
+   });
+
+      
 
 }
 Node.prototype.init = function(item){
 
-   // add div level
-   $("#level"+item.level).append(item.html);
+   item.map.setOptions({styles: mapStyles[item.style]});
 
-   if(item.level == 1){
-      item.html.css("zoom",0.3);
-      item.zoom = 0.3;
-   } 
+
+   // calculate how many levels there
+   levelDepth = 0;
+   for(var i = 0; i<levelNum; i++)
+      if($("#page-2 ul li:nth-child("+(i+1)+") .map").length)
+         levelDepth++;
+
+   // decrease 20% for one more level
+   var rootZoom = Math.pow(0.8, levelDepth-1);
+   var childZoom = (1 - rootZoom) / (levelDepth - 1);
+   
+   root.traverse( function(node){
+
+      // if it's full screen
+      if(node.isfull){
+         node.tempZoom = childZoom;
+         node.html.css("zoom", node.zoom);
+      }
+      else{
+         node.tempZoom = node.zoom = childZoom;
+         node.html.css("zoom", childZoom);
+      }
+
+      node.updateMarker();
+
+   })
+
+   root.zoom = rootZoom;
+   root.html.css("zoom", rootZoom);
+   root.updateMarker();
+
 
    var startX = 0,
        startY = 0,
@@ -93,42 +216,60 @@ Node.prototype.init = function(item){
        width = 0, 
        height = 0;
 
+
    var rect = document.createElement("div");
-   rect.style.border = "6px solid #000";
    rect.style.position = "absolute";
    rect.style.width = width;
    rect.style.height = height;
    rect.id = "rect";
 
 
-   // if key shift, show add listener
-   var showDrawCanvas = function(e){
-
-      if(e.shiftKey){
-         item.html.mousedown(mouseDown);
-      }
-      else
-         item.html[0].removeEventListener("mouseDown", mouseDown);
+   // if it's not the last level
+   // add event listener
+   if((item.level +1) != levelNum){
+      item.html[0].addEventListener("mousedown", mouseDown);
    }
-   item.html.mousemove(showDrawCanvas);
 
    // mouse down
    // add mousemove and mouseup listener
    function mouseDown(e){
-      e.preventDefault();
-      item.html.mousemove(mouseMove);
-      item.html.mouseup(mouseUp);
+      if(e.shiftKey){
 
-      startX = (e.pageX-parseInt(item.html.offset().left)*item.zoom)/item.zoom;
-      startY = (e.pageY-parseInt(item.html.offset().top)*item.zoom)/item.zoom;
-      left = startX;
-      top = startY;
+         item.childStyle = item.style + item.children.length;
+         rect.style.border = "6px solid " + borderColor[item.childStyle];
 
-      rect.style.left = startX+"px";
-      rect.style.top = startY+"px";
-      item.html.append(rect);
-      //console.log(item.html.offset().top*item.zoom, item.html.offset().left*item.zoom, "d");
-      
+         e.preventDefault();
+         item.html[0].addEventListener("mousemove", mouseMove);
+         item.html[0].addEventListener("mouseup", mouseUp);
+
+         startX = (e.pageX-parseInt(item.html.position().left)*item.zoom)/item.zoom;
+         startY = (e.pageY-parseInt(item.html.position().top)*item.zoom)/item.zoom;
+         left = startX;
+         top = startY;
+
+         rect.style.left = startX+"px";
+         rect.style.top = startY+"px";
+         item.html.append(rect);
+
+         if( startX > 3*winwidth/8 && startX < 5*winwidth/8 
+               && startY > winheight/12 && startY < winheight/3 )
+            item.focusNum = 0;
+         else if( startX > winwidth*2/3 && startX < winwidth*11/12 
+               && winheight*3/8 && startY < winheight*5/8 )
+            item.focusNum = 1;
+         else if( startX > winwidth*3/8 && startX < winwidth*5/8 
+               && startY > winheight*2/3 && startY < winheight*11/12 )
+            item.focusNum = 2;
+         else if( startX > winwidth/12 && startX < winwidth/3 
+               && startY > winheight*3/8 && startY < winheight*5/8 )
+            item.focusNum = 3;
+         else if( startX > 3*winwidth/8 && startX < 5*winwidth/8
+               && winheight*3/8 && startY < winheight*5/8 )
+            item.focusNum = 4;
+
+
+
+      }   
    }
 
    // mouse up
@@ -137,31 +278,25 @@ Node.prototype.init = function(item){
 
 
       // remove listener
-      item.html[0].removeEventListener("mouseMove", mouseMove);
-      item.html[0].removeEventListener("mouseUp", mouseUp);
-      item.html[0].removeEventListener("mouseDown", mouseDown);
+      item.html[0].removeEventListener("mousemove", mouseMove);
+      item.html[0].removeEventListener("mouseup", mouseUp);
 
       // remove rect
-      rect.parentNode.removeChild(rect);
+      // rect.parentNode.removeChild(rect);
+      $(rect).remove();
 
-
-
-      var overlay = new google.maps.OverlayView();
-      overlay.draw = function () {};
-      overlay.onRemove = function () {};
-      overlay.setMap(item.map);
-      var prj = overlay.getProjection();
-      var sw = prj.fromContainerPixelToLatLng(new google.maps.Point(left, top-height));
-      var ne = prj.fromContainerPixelToLatLng(new google.maps.Point(left-width, top));
+      
+      
+      var sw = item.prj.fromContainerPixelToLatLng(new google.maps.Point(left, top+height));
+      var ne = item.prj.fromContainerPixelToLatLng(new google.maps.Point(left+width, top));
       var bnds = new google.maps.LatLngBounds(sw, ne);
-      console.log(bnds.getNorthEast(),bnds.getSouthWest());
-      console.log(left, top+height);
-      console.log(left+width, top);
       // add new child
-      item.add( new Node( bnds ) );
+      item.add( new Node( item.level +1, bnds ) );
 
       addRect();
       //console.log(left, top, width, height);
+
+
    }
 
    // mousemove
@@ -200,7 +335,7 @@ Node.prototype.init = function(item){
       // init drawing
       var ctx=tempcanvas.getContext("2d");
       ctx.lineWidth = 10;
-      ctx.strokeStyle = "rgba(0,0,0)";
+      ctx.strokeStyle = borderColor[item.childStyle];
       ctx.strokeRect(0,0, item.rect[index][2],item.rect[index][3]);
 
 
@@ -213,687 +348,204 @@ Node.prototype.init = function(item){
       
    }
 
+   // full screen
+   item.fullscreen.click(function(){
+
+      if(item.isfull){
+
+         item.isfull = false;
+         item.zoom = item.tempZoom;
+         item.html.css("zoom", childZoom);
+      }
+      else{
+
+         item.isfull = true;
+         item.zoom = 1;
+         item.html.css("zoom", 1);
+
+         // scroll page
+         $("#page-2").scrollTop($("#page-2").scrollTop() + item.html.offset().top);
+
+      }
+         
+   });
+
+   // delete 
+   item.deleteBtn.click(function(){
+
+      item.traverse( function(node){
+
+         node.html.remove();
+         node.parent.children.splice( node.parent.children.indexOf(node), 1 );
+
+      })
+
+   });
 
 }
-
-
-
-        
-
-
 
 
 Node.prototype.add = function(item){
-   item.parent = this;
-   item.level = item.parent.level + 1;
-   this.children.push(item);
 
-   
+   this.children.push(item);
+   item.style = item.childStyle = this.childStyle;
+   item.parent = this;
    item.init(item);
+   item.genNum = this.focusNum;
    return item;
 }
 
-Node.prototype.remove = function(item){
+Node.prototype.remove = function( callback ){
 
-   item.parent = null;
-   
-   this.children.splice( this.children.indexOf(item), 1 );
+
+   callback && callback( this );
+
+   this.children.forEach(function(node){
+
+      node.parent.children.splice( node.parent.children.indexOf(node), 1 );
+      node.html.remove();
+
+      node.remove( callback );
+   })
+
+      
+
 }
 
-Node.prototype.getLevelNum = function(){
+Node.prototype.traverse = function( callback ){
 
-   var index = 0;
-   var item = this;
+   callback && callback( this );
 
-   while(item.parent){
-      index++;
-      item = item.parent;
-   }
+   this.children.forEach(function(node){
 
-   this.level = index;
-   console.log(index);
+      node.traverse( callback );
+   })
+};
+
+Node.prototype.updateMarker = function(  ){
+
+   var self = this;
+
+   self.markerArray.forEach( function(node) {
+
+      // marker lat and lng
+      var latlng = self.prj.fromContainerPixelToLatLng(
+                           new google.maps.Point(rectPoint[node.index][0], rectPoint[node.index][1]));
+
+      // create marker
+      node.marker.setPosition(latlng);
+
+ 
+
+   })
+
+
+};
+
+
+
+
+
+      
+
+
+
+
+
+// class marker
+var Marker = function( index, self ){
+
+   this.index = index;
+
+   // marker lat and lng
+   var latlng = self.prj.fromContainerPixelToLatLng(
+                        new google.maps.Point(rectPoint[index][0], rectPoint[index][1]));
+
+   // create marker
+   this.marker = new google.maps.Marker({
+                  position: new google.maps.LatLng(latlng.lat(), latlng.lng()),
+                  map: self.map,
+                  index: index,
+                  icon: this.createMarker(rectWidth, rectHeight)
+               });
+
+   google.maps.event.addListener(this.marker, 'mouseover', function() {
+      self.focusNum = this.index;
+   });
+
 }
 
-var root = new Node(  );
-root.init(root);
+// draw marker on a canvas
+Marker.prototype.createMarker = function(width, height) {
 
+   var canvas, context;
 
-      
+   canvas = document.createElement("canvas");
+   canvas.width = width;
+   canvas.height = height;
 
+   context = canvas.getContext("2d");
 
+   context.clearRect(0,0,width,height);
 
-      
+   // border is black
+   context.strokeStyle = "rgba(0,0,0,0.2)";
+   context.lineWidth = 10;
+   context.rect(0,0,width,height);
 
+   context.stroke();
 
+   return canvas.toDataURL();
 
+}
 
-
-
-
-   
-
-
-
-
-   
-
-
-
-
-
-   var levelNum = 0;
-   var levelCanvasNum = new Array(0, 0, 0); // 
-   var displayRatio = new Array([1, 1], [0.7, 0.3], [0.6, 0.2], [0.55, 0.15], [0.6, 0.1]);
-   var curLevel = 0;
-   var curIndex = 0;
-   var centerHeight = 0.6;
-
-   var lastScrolledLeft = 0;
-   var lastScrolledTop = 0;
-   var xMousePos = 0;
-   var yMousePos = 0;
-   var parentDiv = "";
-  /*
-   init();
-
-   function init() {
-      newCanvas(0);
-   }
-*/
-
-   /*
-	$(".canvas").live('dblclick', function() {
-		var temp = $(this).parent().attr("id").split("-");
-		if( ++temp[1] > 2 )
-			showTip("Sorry, no more than three levels ");
-		else if(levelCanvasNum[temp[1]]== 5) //maximum 5 canvas per level
-			showTip("Sorry, no more than five children per level ");
-		else
-			newCanvas(temp[1]);
-	});
-	*/
-   
-	$(".canvas").live('dblclick', function(e) {
-		var temp = $(this).parent().attr("id").split("-");
-		console.log(e.pageX, e.pageY);
-		toggleZoomCanvas(temp[1],temp[2]);
-	});
-/*
-	$(".canvas").click(function(){
-
-		var temp = $(this).parent().attr("id").split("-");
-		console.log(temp[1]);
-		newCanvas(++temp[1]);
-	});*/
-   var zoomedNum = 0;
-   var zoomedSizeBig = 60;
-   var zoomedSizeSmall = 20;
-   var selectDivs = 0;
-
-   function toggleZoomCanvas(level, index) {
-
-
-      if ($(" #level-" + level + "-" + index + ".canvasBox").hasClass("bigger")) {
-         // already bigger, be smaller!
-         $(" #level-" + level + "-" + index + ".canvasBox").removeClass("bigger");
-         zoomedNum--;
-         resetStyle();
-      } else {
-         // make it bigger
-         $(".canvasBox.level"+level).removeClass("bigger");
-         $("#level-" + level + "-" + index + ".canvasBox").addClass("bigger");
-         zoomedNum++;
-         if (levelCanvasNum[level] == 2 && levelNum == 2) {
-            zoomedSizeBig = 80;
-            zoomedSizeSmall = 20;
-         } else if (levelCanvasNum[level] == 4) {
-            zoomedSizeBig = 55;
-            zoomedSizeSmall = 15;
-         } else if (levelCanvasNum[level] == 5) {
-            zoomedSizeBig = 40;
-            zoomedSizeSmall = 15;
-         } else {
-            zoomedSizeBig = 60;
-            zoomedSizeSmall = 20;
-         }
-         /*
-         for (var i = 0; i < levelNum; i++) {
-            if (i == level || $("#level-" + i).children().hasClass("bigger")) {
-               $("#level-" + i).css("height", zoomedSizeBig + "%");
-            } else $("#level-" + i).css("height", zoomedSizeSmall + "%");
-         }*/
-         $(".canvasBox").css("zoom", zoomedSizeSmall + "%");
-         $(".bigger").css("zoom", zoomedSizeBig + "%");
-
-         if(level == 2)
-            playMarker(level, index);
-      }
+// clear marker
+Marker.prototype.clear = function() {
+   this.marker.setMap(null);
+}
 
 
 
+
+$(".restart").click(function(){
+   document.location.href = "http://localhost:8888/" ;
+})
+
+
+
+var val = getUrlVars();
+childNum = parseInt(val["child"]);
+levelNum = parseInt(val["level"]);
+$("#level span").html(levelNum);
+$("#child span").html(childNum);
+console.log(levelNum, childNum);
+// Read a page's GET URL variables and return them as an associative array.
+function getUrlVars()
+{
+    var vars = [], hash;
+    var hashes = window.location.href.slice(window.location.href.indexOf('?') + 1).split('&');
+    for(var i = 0; i < hashes.length; i++)
+    {
+        hash = hashes[i].split('=');
+        vars.push(hash[0]);
+        vars[hash[0]] = hash[1];
+    }
+    return vars;
+}
+
+initMap();
+var root;
+function initMap(){
+
+   generateTarget();
+
+   // init level <li>
+   for(var i = 0; i<levelNum; i++){
+      $("#page-2 ul").append("<li id='level"+i+"' class='level'></li>");
    }
 
-   function newCanvas(level, feeds, bnds, olevel, oindex, parent) {
-      // google map 
-      var tempHTML; // html of a new level
-      curLevel = level;
-      levelCanvasNum[level]++; // canvas numbers for each level from 1, 2, 3, 4, 5. 
-      //curIndex = levelCanvasNum[level] - 1; // index from 0, 1, 2, ...
-      if(curLevel == 1){
-         for(var i = 0; i<5; i++){
-            if(levelOneStyle[i] == 0){
-               curIndex = i;
-               levelOneStyle[i] = 1;
-               break;
-            }
-         }
-      }
-      else if(curLevel == 2){
-         for(var i = 0; i<5; i++){
-            if(levelTwoStyle[i] == 0){
-               curIndex = i;
-               levelTwoStyle[i] = 1;
-               break;
-            }
-         }
+   root = new Node( 0 );
+   root.init(root);
 
-      }
-
-      if (levelCanvasNum[level] == 1) { // create a new level
-         tempHTML = "<div id='level-" + curLevel + "' class='clear levelBox'></div>\
-				          	<div alt='"+parent+"' id='level-" + curLevel + "-" + curIndex + "' class='canvasBox level"+level+"' style='width:" + (winwidth - 12) + "px;height:" + (winheight - 12) + "px'>\
-				            	<div class='canvas' id='map-" + curLevel + "-" + curIndex + "' ></div>\
-				          	</div>"
-         $("#page-2").append(tempHTML);
-         levelNum++;
-      } else { // add a new canvas to an existed level
-         tempHTML = "<div alt='"+parent+"' id='level-" + curLevel + "-" + curIndex + "' class='canvasBox level"+level+"' style='width:" + (winwidth - 12) + "px;height:" + (winheight - 12) + "px'>\
-				            <div class='canvas' id='map-" + curLevel + "-" + curIndex + "' ></div>\
-				        </div>"
-         $("#level-" + curLevel+ "-" + (curIndex-1)).after(tempHTML);
-      }
-
-
-      //console.log(bnds);
-
-
-
-      var mapOptions = {
-         scrollwheel: false,
-         mapTypeControl: false,
-         scaleControl: false,
-         center: new google.maps.LatLng(40, -30),
-         zoom: 3,
-         disableDoubleClickZoom: true,
-         mapTypeId: google.maps.MapTypeId.ROADMAP,
-         //draggable: false,
-         //zoomControl: false,
-         streetViewControl: false,
-         panControl: false
-      };
-      var map = new google.maps.Map(document.getElementById("map-" + curLevel + "-" + curIndex),
-      mapOptions);
-
-
-
-      
-      
-      if (typeof bnds !== "undefined") {
-         z = map.getZoom();
-         map.fitBounds(bnds);
-         if (map.getZoom() < z) {
-            map.setZoom(z);
-         }
-		 //$("map-" + curLevel + "-" + curIndex).css('borderColor',$("#").css('borderColor'))
-		 
-      }
-      var getMousePosition = function (e, map) {
-         var zoomValue = ($("#" + $($("#" + (map.getDiv().getAttribute('id'))).parent()).attr("id")).css('zoom'));
-         //console.log(zoomValue);
-         e = e || window.event;
-         if (typeof e.pageX !== "undefined") {
-            xMousePos = (e.clientX + (lastScrolledLeft)) / zoomValue;
-            yMousePos = (e.clientY + ((lastScrolledTop))) / zoomValue;
-            //console.log( (yMousePos*zoomValue),e .clientY,lastScrolledTop,"test");
-         }
-         return {
-            left: xMousePos,
-            top: yMousePos
-         };
-      };
-      $("#page-2").scroll(function (e) {
-         if (lastScrolledLeft != $("#page-2").scrollLeft()) {
-            xMousePos -= lastScrolledLeft;
-            lastScrolledLeft = $("#page-2").scrollLeft();
-            xMousePos += lastScrolledLeft;
-         }
-         if (lastScrolledTop != $("#page-2").scrollTop()) {
-            yMousePos -= lastScrolledTop;
-            lastScrolledTop = $("#page-2").scrollTop();
-            //yMousePos += lastScrolledTop;
-         }
-      });
-      /*
-	  We need to work here on getting the relative position to work with real-time drawing
-	  */
-      var getElementPosition = function (h) {
-         var posX = h.offsetLeft;
-         var posY = h.offsetTop;
-         var parent = h.offsetParent;
-         // Add offsets for all ancestors in the hierarchy
-         while (parent !== null) {
-            if (parent !== document.body && parent !== document.documentElement) {
-               //posX -= parent.scrollLeft;
-               //posY -= parent.scrollTop;
-               //console.log(posX, posY, parent.scrollTop, $(h).attr('id'), "testelem");
-            }
-            // See http://groups.google.com/group/google-maps-js-api-v3/browse_thread/thread/4cb86c0c1037a5e5
-            // Example: http://notebook.kulchenko.com/maps/gridmove
-            var m = parent;
-            // This is the "normal" way to get offset information:
-            var moffx = m.offsetLeft;
-            var moffy = m.offsetTop;
-            // This covers those cases where a transform like scale is used:
-            if (!moffx && !moffy && window.getComputedStyle) {
-               var matrix = document.defaultView.getComputedStyle(m, null).MozTransform || document.defaultView.getComputedStyle(m, null).WebkitTransform;
-               if (matrix) {
-                  if (typeof matrix === "string") {
-                     var parms = matrix.split(",");
-                     moffx += parseInt(parms[4], 10) || 0;
-                     moffy += parseInt(parms[5], 10) || 0;
-                  }
-               }
-            }
-            posX += moffx;
-            posY += moffy;
-            parent = parent.offsetParent;
-         }
-         return {
-            left: posX,
-            top: posY
-         };
-      };
-      var setVals = function (obj, vals) {
-         if (obj && vals) {
-            for (var x in vals) {
-               if (vals.hasOwnProperty(x)) {
-                  obj[x] = vals[x];
-               }
-            }
-         }
-         return obj;
-      };
-      var setOpacity = function (h, op) {
-         if (typeof op !== "undefined") {
-            h.style.opacity = op;
-         }
-      };
-
-      function DragZoom(map, opt_zoomOpts) {
-         var me = this;
-         var ov = new google.maps.OverlayView();
-         ov.onAdd = function () {
-            me.init_(map, opt_zoomOpts);
-         };
-         ov.draw = function () {};
-         ov.onRemove = function () {};
-         ov.setMap(map);
-         this.prjov_ = ov;
-      }
-      DragZoom.prototype.init_ = function (map, opt_zoomOpts) {
-         var i;
-         var me = this;
-         this.level_ = curLevel;
-         this.parentDiv_ = parent;
-         this.map_ = map;
-         this.key_ = "shift";
-         this.key_ = this.key_.toLowerCase();
-         // this.borderWidths_ = getBorderWidths(this.map_.getDiv());
-         this.veilDiv_ = [];
-         for (i = 0; i < 4; i++) {
-            this.veilDiv_[i] = document.createElement("div");
-            // Apply default style values for the veil:
-            setVals(this.veilDiv_[i].style, {
-               backgroundColor: "gray",
-               opacity: 0.25,
-               cursor: "crosshair"
-            });
-            // Apply mandatory style values:
-            setVals(this.veilDiv_[i].style, {
-               position: "absolute",
-               overflow: "hidden",
-               display: "none"
-            });
-            setOpacity(this.veilDiv_[i]);
-            this.map_.getDiv().appendChild(this.veilDiv_[i]);
-         }
-         this.listeners_ = [
-         google.maps.event.addDomListener(document, "keydown", function (e) {
-            me.onKeyDown_(e);
-         }),
-         google.maps.event.addDomListener(document, "keyup", function (e) {
-            me.onKeyUp_(e);
-         }),
-         google.maps.event.addDomListener(this.veilDiv_[0], "mousedown", function (e) {
-            me.onMouseDown_(e);
-         }),
-         google.maps.event.addDomListener(this.veilDiv_[1], "mousedown", function (e) {
-            me.onMouseDown_(e);
-         }),
-         google.maps.event.addDomListener(this.veilDiv_[2], "mousedown", function (e) {
-            me.onMouseDown_(e);
-         }),
-         google.maps.event.addDomListener(this.veilDiv_[3], "mousedown", function (e) {
-            me.onMouseDown_(e);
-         }),
-         google.maps.event.addDomListener(document, "mousedown", function (e) {
-            me.onMouseDownDocument_(e);
-         }),
-         google.maps.event.addDomListener(document, "mousemove", function (e) {
-            me.onMouseMove_(e);
-         }),
-         google.maps.event.addDomListener(document, "dblclick", function (e) {
-            me.onMouseDblClick_(e);
-         }),
-         google.maps.event.addDomListener(document, "mouseup", function (e) {
-            me.onMouseUp_(e);
-         }), ];
-         this.hotKeyDown_ = false;
-         this.mouseDown_ = false;
-         this.dragging_ = false;
-         this.startPt_ = null;
-         this.endPt_ = null;
-         this.mapWidth_ = null;
-         this.mapHeight_ = null;
-         this.mousePosn_ = null;
-         this.mapPosn_ = null;
-      };
-      DragZoom.prototype.onMouseDblClick_ = function (e) {
-         //var temp = $(this.map_.getDiv()).parent().attr("id").split("-");
-         //console.log(temp[1]);
-         //toggleZoomCanvas(temp[1],temp[2]);
-      };
-      DragZoom.prototype.isHotKeyDown_ = function (e) {
-         var isHot;
-         e = e || window.event;
-         isHot = (e.shiftKey && this.key_ === "shift");
-         if (!isHot) {
-            if ((this.key_ === "shift") && (e.keyCode === 16)) {
-               isHot = true;
-            }
-         }
-         return isHot;
-      };
-      DragZoom.prototype.isMouseOnMap_ = function () {
-         var mousePosn = this.mousePosn_;
-         if (mousePosn) {
-            var mapPosn = this.mapPosn_;
-            var mapDiv = this.map_.getDiv();
-            //console.log($(mapDiv).attr('id'), mousePosn.top, mapPosn.top, mapDiv.offsetHeight, (mapPosn.top + mapDiv.offsetHeight), "test2");
-            return mousePosn.left > mapPosn.left && mousePosn.left < (mapPosn.left + mapDiv.offsetWidth) && mousePosn.top > mapPosn.top && mousePosn.top < (mapPosn.top + mapDiv.offsetHeight);
-         } else {
-            // if user never moved mouse
-            return false;
-         }
-      };
-      DragZoom.prototype.setVeilVisibility_ = function () {
-         var i;
-         if (this.map_ && this.hotKeyDown_ && this.isMouseOnMap_()) {
-            var mapDiv = this.map_.getDiv();
-            this.mapWidth_ = mapDiv.offsetWidth;
-            this.mapHeight_ = mapDiv.offsetHeight;
-            if (this.activatedByControl_) { // Veil covers entire map (except control)
-               var left = parseInt(this.buttonDiv_.style.left, 10);
-               var top = parseInt(this.buttonDiv_.style.top, 10);
-               var width = this.visualSize_.width;
-               var height = this.visualSize_.height;
-               // Left veil rectangle:
-               this.veilDiv_[0].style.top = "0px";
-               this.veilDiv_[0].style.left = "0px";
-               this.veilDiv_[0].style.width = left + "px";
-               this.veilDiv_[0].style.height = this.mapHeight_ + "px";
-               // Right veil rectangle:
-               this.veilDiv_[1].style.top = "0px";
-               this.veilDiv_[1].style.left = (left + width) + "px";
-               this.veilDiv_[1].style.width = (this.mapWidth_ - (left + width)) + "px";
-               this.veilDiv_[1].style.height = this.mapHeight_ + "px";
-               // Top veil rectangle:
-               this.veilDiv_[2].style.top = "0px";
-               this.veilDiv_[2].style.left = left + "px";
-               this.veilDiv_[2].style.width = width + "px";
-               this.veilDiv_[2].style.height = top + "px";
-               // Bottom veil rectangle:
-               this.veilDiv_[3].style.top = (top + height) + "px";
-               this.veilDiv_[3].style.left = left + "px";
-               this.veilDiv_[3].style.width = width + "px";
-               this.veilDiv_[3].style.height = (this.mapHeight_ - (top + height)) + "px";
-               for (i = 0; i < this.veilDiv_.length; i++) {
-                  this.veilDiv_[i].style.display = "block";
-               }
-            } else {
-               this.veilDiv_[0].style.left = "0px";
-               this.veilDiv_[0].style.top = "0px";
-               this.veilDiv_[0].style.width = this.mapWidth_ + "px";
-               this.veilDiv_[0].style.height = this.mapHeight_ + "px";
-               for (i = 1; i < this.veilDiv_.length; i++) {
-                  this.veilDiv_[i].style.width = "0px";
-                  this.veilDiv_[i].style.height = "0px";
-               }
-               for (i = 0; i < this.veilDiv_.length; i++) {
-                  this.veilDiv_[i].style.display = "block";
-               }
-            }
-         } else {
-            for (i = 0; i < this.veilDiv_.length; i++) {
-               this.veilDiv_[i].style.display = "none";
-            }
-         }
-      };
-      DragZoom.prototype.onKeyDown_ = function (e) {
-
-         if (this.map_ && !this.hotKeyDown_ && this.isHotKeyDown_(e) && this.level_<2 && levelCanvasNum[this.level_+1]< 5) {
-            this.mapPosn_ = getElementPosition(this.map_.getDiv());
-            this.hotKeyDown_ = true;
-            this.activatedByControl_ = false;
-            this.setVeilVisibility_();
-         }
-      };
-      DragZoom.prototype.getMousePoint_ = function (e) {
-         var mousePosn = getMousePosition(e, this.map_);
-         var p = new google.maps.Point();
-         p.x = mousePosn.left - this.mapPosn_.left;
-         p.y = mousePosn.top - this.mapPosn_.top;
-         p.x = Math.min(p.x, this.mapWidth_);
-         p.y = Math.min(p.y, this.mapHeight_);
-         p.x = Math.max(p.x, 0);
-         p.y = Math.max(p.y, 0);
-         return p;
-      };
-      DragZoom.prototype.onMouseDown_ = function (e) {
-         if (this.map_ && this.hotKeyDown_) {
-            this.mapPosn_ = getElementPosition(this.map_.getDiv());
-            this.dragging_ = true;
-            this.startPt_ = this.endPt_ = this.getMousePoint_(e);
-            var prj = this.prjov_.getProjection();
-            var latlng = prj.fromContainerPixelToLatLng(this.startPt_);
-            this.boxDiv_ = document.createElement("div");
-            this.parentDiv_ = "selectDiv" + curLevel + "-" + selectDivs;
-            this.boxDiv_.setAttribute("id", "selectDiv" + curLevel + "-" + selectDivs);
-            this.boxDiv_.setAttribute("class", "selectDiv"); //!!!
-
-            if(this.level_ == 0){
-
-               for(var i = 0; i<5; i++){
-                  if(levelOneStyle[i] == 0){
-                     this.boxDiv_.setAttribute("class", "selectDiv styleDiv" + i);
-                     break;
-                  }
-               }
-
-            }
-
-            setVals(this.boxDiv_.style, {
-               position: "absolute",
-               display: "none"
-            });
-            setOpacity(this.boxDiv_);
-            this.map_.getDiv().appendChild(this.boxDiv_);
-            //this.boxBorderWidths_ = getBorderWidths(this.boxDiv_);
-            this.boxDiv_.style.width = this.boxDiv_.style.height = "0px";
-         }
-      };
-      DragZoom.prototype.onMouseDownDocument_ = function (e) {
-         this.mouseDown_ = true;
-      };
-      DragZoom.prototype.onMouseMove_ = function (e) {
-         this.mousePosn_ = getMousePosition(e, this.map_);
-         if (this.dragging_) {
-            this.endPt_ = this.getMousePoint_(e);
-            var left = Math.min(this.startPt_.x, this.endPt_.x);
-            var top = Math.min(this.startPt_.y, this.endPt_.y);
-            var width = Math.abs(this.startPt_.x - this.endPt_.x);
-            var height = Math.abs(this.startPt_.y - this.endPt_.y);
-            var boxWidth = Math.max(0, width);
-            var boxHeight = Math.max(0, height);
-            // Left veil rectangle:
-            this.veilDiv_[0].style.top = "0px";
-            this.veilDiv_[0].style.left = "0px";
-            this.veilDiv_[0].style.width = left + "px";
-            this.veilDiv_[0].style.height = this.mapHeight_ + "px";
-            // Right veil rectangle:
-            this.veilDiv_[1].style.top = "0px";
-            this.veilDiv_[1].style.left = (left + width) + "px";
-            this.veilDiv_[1].style.width = (this.mapWidth_ - (left + width)) + "px";
-            this.veilDiv_[1].style.height = this.mapHeight_ + "px";
-            // Top veil rectangle:
-            this.veilDiv_[2].style.top = "0px";
-            this.veilDiv_[2].style.left = left + "px";
-            this.veilDiv_[2].style.width = width + "px";
-            this.veilDiv_[2].style.height = top + "px";
-            // Bottom veil rectangle:
-            this.veilDiv_[3].style.top = (top + height) + "px";
-            this.veilDiv_[3].style.left = left + "px";
-            this.veilDiv_[3].style.width = width + "px";
-            this.veilDiv_[3].style.height = (this.mapHeight_ - (top + height)) + "px";
-            // Selection rectangle:
-            this.boxDiv_.style.top = top + "px";
-            this.boxDiv_.style.left = left + "px";
-            this.boxDiv_.style.width = boxWidth + "px";
-            this.boxDiv_.style.height = boxHeight + "px";
-            this.boxDiv_.style.display = "block";
-         } else if (!this.mouseDown_) {
-            this.mapPosn_ = getElementPosition(this.map_.getDiv());
-            this.setVeilVisibility_();
-         }
-      };
-      DragZoom.prototype.onMouseUp_ = function (e) {
-         var z;
-         var me = this;
-         this.mouseDown_ = false;
-         if (this.dragging_) {
-            if ((this.getMousePoint_(e).x === this.startPt_.x) && (this.getMousePoint_(e).y === this.startPt_.y)) {
-               this.onKeyUp_(e); // Cancel event
-               return;
-            }
-            var left = Math.min(this.startPt_.x, this.endPt_.x);
-            var top = Math.min(this.startPt_.y, this.endPt_.y);
-            var width = Math.abs(this.startPt_.x - this.endPt_.x);
-            var height = Math.abs(this.startPt_.y - this.endPt_.y);
-            var prj = this.prjov_.getProjection();
-            var sw = prj.fromContainerPixelToLatLng(new google.maps.Point(left, top + height));
-            var ne = prj.fromContainerPixelToLatLng(new google.maps.Point(left + width, top));
-            var bnds = new google.maps.LatLngBounds(sw, ne);
-            // var transform = ['scale(' + 0.5 + ')'];
-            // $("#map_outer").css('-webkit-transform', transform.join(' '));
-            var temp = this.map_.getDiv().id.split("-");
-            var oldLevel = temp[1];
-            var oldIndex = temp[2];
-
-            if (++temp[1] > 2) showTip("Sorry, no more than three levels ");
-            else if (levelCanvasNum[temp[1]] == 5) //maximum 5 canvas per level
-            showTip("Sorry, no more than five children per level ");
-            else newCanvas(temp[1], feeds, bnds, oldLevel, oldIndex, this.parentDiv_);
-            this.dragging_ = false;
-            this.onMouseMove_(e);
-            if (!this.isHotKeyDown_(e)) {
-               this.onKeyUp_(e);
-            }
-         }
-      };
-      DragZoom.prototype.onKeyUp_ = function (e) {
-         var i;
-         var left, top, width, height, prj, sw, ne;
-         var bnds = null;
-         if (this.map_ && this.hotKeyDown_) {
-            this.hotKeyDown_ = false;
-            if (this.dragging_) {
-               this.boxDiv_.style.display = "none";
-               this.dragging_ = false;
-               // Calculate the bounds when drag zoom was cancelled
-            }
-            for (i = 0; i < this.veilDiv_.length; i++) {
-               this.veilDiv_[i].style.display = "none";
-            }
-         }++selectDivs;
-      };
-      google.maps.Map.prototype.enableKeyDragZoom = function (opt_zoomOpts) {
-         this.dragZoom_ = new DragZoom(this, opt_zoomOpts);
-      };
-      map.enableKeyDragZoom({});
-      
-      resetStyle();
-      centerAlign();
-      generateMarker(level, curIndex, feeds, map, bnds, olevel, oindex);
-
-
-   }
-
-   var levelHeight = new Array(0, 0, 0);
-   function resetStyle() {
-      var defaultHeight = 100 / levelNum;
-      
-      for (var i = levelNum - 1; i > 0; i--) {
-         levelHeight[i] = 100 / levelCanvasNum[i];
-         if (levelHeight[i] > defaultHeight) {
-            levelHeight[i] = defaultHeight;
-         }
-         //$("#level-"+i).css("height", levelHeight[i] + "%");
-         if(i == 1){
-            for (var j = 0; j < 5; j++) {
-               if(levelOneStyle[j]){
-                  $("#level-" + i + "-" + j + ".canvasBox").css("zoom", (levelHeight[i]) + "%");
-                  /*
-                  $("#level-"+i+"-"+j+".canvasBox").css("height", levelHeight[i]+"%");
-                  $("#level-"+i+"-"+j+".canvasBox").css("width", levelHeight[i]+"%");
-                  */
-               }
-            }
-         }
-         else if(i == 2){
-            for (var j = 0; j < 5; j++) {
-               if(levelTwoStyle[j]){
-                  $("#level-" + i + "-" + j + ".canvasBox").css("zoom", (levelHeight[i]) + "%");
-                  /*
-                  $("#level-"+i+"-"+j+".canvasBox").css("height", levelHeight[i]+"%");
-                  $("#level-"+i+"-"+j+".canvasBox").css("width", levelHeight[i]+"%");
-                  */
-               }
-            }
-         }
-            
-      }
-      // for level 0
-      levelHeight[0] = 100 - levelHeight[1] - levelHeight[2];
-      //$("#level-0").css("height", levelHeight[0] + "%");
-      $("#level-0-0.canvasBox").css("zoom", levelHeight[0] + "%");
-      /*
-		$("#level-0-0.canvasBox").css("height", levelHeight[0]+"%");
-		$("#level-0-0.canvasBox").css("width", levelHeight[0]+"%");
-*/    
-      $(".canvasBox").css("left", "");
-   }
-
-   
-
-
+}
 
