@@ -490,12 +490,12 @@ input:-moz-placeholder, textarea:-moz-placeholder {
 
 
 .setup{
-	width: 440px;
+	width: 560px;
 	height: 360px;
 	position: absolute;
 	top: 50%;
 	left: 50%;
-	margin-left: -250px;
+	margin-left: -300px;
 	margin-top: -200px;
 	background: #fff;
 	padding: 20px;
@@ -515,7 +515,7 @@ input:-moz-placeholder, textarea:-moz-placeholder {
 }
 .setup li.h-60{
 	padding: 20px;
-	width: 400px;
+	width: 510px;
 	border: 1px solid #ddd;
 	line-height: 30px;
 	height: 60px;
@@ -534,7 +534,6 @@ input:-moz-placeholder, textarea:-moz-placeholder {
 .setup li p.right{
 	color: #bbb;
 	margin-left: 20px;
-	width: 290px;
 }
 .setup li p span{
 	text-align: center;
@@ -546,6 +545,9 @@ input:-moz-placeholder, textarea:-moz-placeholder {
 	border: 1px solid #bbb;
 	font-size: 20px;
 	cursor: pointer;
+}
+.setup li p span:last-child{
+	margin-right: 0;
 }
 .setup li p span.btn{
 	float: right;
@@ -564,6 +566,7 @@ input:-moz-placeholder, textarea:-moz-placeholder {
 .finish{
 	margin-top: -60px;
 	height: 150px;
+	width: 440px;
 	border: 1px solid #eee;
 	display: none;
 }
